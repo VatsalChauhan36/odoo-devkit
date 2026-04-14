@@ -86,7 +86,7 @@ $env:ODOO_MCP_ROOTS = "C:\your\addons;C:\odoo\server\addons;C:\odoo\server\odoo\
 
 > Use `:` as separator on Linux/macOS, `;` on Windows.
 
-### Option B — CLI flags
+### Option B — CLI flags (deprecated, no-op)
 
 ```bash
 uv run odoo-devkit \
@@ -94,6 +94,8 @@ uv run odoo-devkit \
   --roots /path/to/odoo/server/addons \
   --roots /path/to/odoo/server/odoo/addons
 ```
+
+`--roots` is kept only for backward compatibility and is ignored. Use `ODOO_MCP_ROOTS` or the saved config file instead.
 
 ### Optional — Odoo docs search
 
@@ -111,6 +113,24 @@ export ODOO_MCP_DOCS_PATH="/path/to/odoo/documentation"
 ```powershell
 $env:ODOO_MCP_DOCS_PATH = "C:\odoo\documentation"
 ```
+
+### Dashboard behavior (Serena-style flow)
+
+The web dashboard starts with the MCP server by default.
+
+- `open_browser` (saved config): controls auto-open on startup
+- `enable_dashboard` (saved config): controls whether dashboard starts at all
+- `dashboard_host` (saved config): bind address (default `127.0.0.1`)
+
+CLI overrides:
+
+```bash
+uv run odoo-devkit --no-dashboard
+uv run odoo-devkit --dashboard-host 0.0.0.0
+uv run odoo-devkit --no-open-browser
+```
+
+If auto-open is disabled or unavailable (for example headless Linux), use the `open_dashboard` MCP tool to trigger browser opening manually.
 
 ---
 
@@ -270,6 +290,12 @@ Once your MCP client is running, you can ask your AI assistant:
 | `init_update_patch` | Add import statements to `__init__.py` |
 | `run_module_upgrade` | Run `odoo-bin -u <module> --stop-after-init` (requires `odoo_bin` path) |
 
+### Runtime UI
+
+| Tool | Description |
+|------|-------------|
+| `open_dashboard` | Open the running dashboard in the default browser |
+
 ---
 
 ## Recommended Low-Token Workflows
@@ -347,7 +373,7 @@ They compose the lower-level tools for you and usually save several MCP round tr
 ## Troubleshooting
 
 **`No valid roots found` error**
-→ You haven't configured any roots. Set `ODOO_MCP_ROOTS` or use `--roots` flags.
+→ You haven't configured any roots. Set `ODOO_MCP_ROOTS` or configure roots in `~/.odoo-devkit/config.json`.
 
 **`rg: command not found`**
 → Install ripgrep: `sudo apt install ripgrep` (Ubuntu) / `brew install ripgrep` (macOS)
@@ -355,6 +381,10 @@ They compose the lower-level tools for you and usually save several MCP round tr
 **MCP server not connecting in Claude Code**
 → Check the `--directory` path in your config points to where you cloned the repo.
 → Run `uv sync` again inside the repo directory.
+
+**Dashboard did not open automatically**
+→ Check `open_browser` is enabled in config, or pass `--open-browser`.
+→ On headless Linux (no `DISPLAY`/`WAYLAND_DISPLAY`), auto-open is skipped; use `open_dashboard` or open the dashboard URL manually.
 
 **`uv: command not found`**
 → Install uv: `curl -LsSf https://astral.sh/uv/install.sh | sh` then restart your terminal.

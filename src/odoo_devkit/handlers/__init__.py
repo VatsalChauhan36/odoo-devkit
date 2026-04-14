@@ -13,6 +13,7 @@ from . import (
     scaffold,
     search,
     security,
+    ui,
     upgrade,
     validate,
     views,
@@ -33,6 +34,7 @@ _HANDLERS = [
     validate,
     workflows,
     upgrade,
+    ui,
     rpc,
 ]
 

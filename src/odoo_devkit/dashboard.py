@@ -10,9 +10,11 @@ from __future__ import annotations
 
 import logging as _logging
 import os
+import platform
 import socket
+import subprocess
+import sys
 import threading
-import webbrowser
 from pathlib import Path
 
 from .config import CONFIG_FILE, OdooDevkitConfig
@@ -20,18 +22,45 @@ from .config import CONFIG_FILE, OdooDevkitConfig
 DASHBOARD_DIR = Path(__file__).parent / "resources" / "dashboard"
 
 _log = _logging.getLogger(__name__)
+_last_dashboard_url: str | None = None
 
 
-def _find_free_port(start: int = 24380) -> int:
+def _find_free_port(host: str = "127.0.0.1", start: int = 24380) -> int:
     port = start
     while port <= 65535:
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                s.bind(("127.0.0.1", port))
+                s.bind((host, port))
                 return port
         except OSError:
             port += 1
     raise RuntimeError("No free port found")
+
+
+def _system_has_usable_display() -> bool:
+    system = platform.system()
+    if system in {"Darwin", "Windows"}:
+        return True
+    return bool(os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"))
+
+
+def _open_dashboard_in_browser(url: str) -> bool:
+    if not _system_has_usable_display():
+        _log.warning("Not opening dashboard automatically because no usable display was detected.")
+        return False
+    try:
+        # Launch detached so browser-open side effects never write to MCP stdio streams.
+        subprocess.Popen(
+            [sys.executable, "-c", f"import webbrowser; webbrowser.open({url!r})"],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+        return True
+    except Exception as exc:
+        _log.warning("Could not open dashboard automatically: %s", exc)
+        return False
 
 
 def _build_app():
@@ -65,22 +94,27 @@ def _build_app():
             "username":     cfg.username,
             "password":     cfg.password,
             "open_browser": cfg.open_browser,
+            "enable_dashboard": cfg.enable_dashboard,
+            "dashboard_host": cfg.dashboard_host,
         })
 
     @app.route("/api/config", methods=["POST"])
     def save_config():
         data = request.get_json() or {}
+        existing = OdooDevkitConfig.load()
         cfg = OdooDevkitConfig(
-            roots=data.get("roots") or [],
-            odoo_bin=data.get("odoo_bin") or "",
-            odoo_config=data.get("odoo_config") or "",
-            database=data.get("database") or "",
-            docs_path=data.get("docs_path") or "",
-            python_path=data.get("python_path") or "",
-            url=data.get("url") or "http://localhost:8069",
-            username=data.get("username") or "admin",
-            password=data.get("password") or "",
-            open_browser=bool(data.get("open_browser", True)),
+            roots=data.get("roots", existing.roots) or [],
+            odoo_bin=data.get("odoo_bin", existing.odoo_bin) or "",
+            odoo_config=data.get("odoo_config", existing.odoo_config) or "",
+            database=data.get("database", existing.database) or "",
+            docs_path=data.get("docs_path", existing.docs_path) or "",
+            python_path=data.get("python_path", existing.python_path) or "",
+            url=data.get("url", existing.url) or "http://localhost:8069",
+            username=data.get("username", existing.username) or "admin",
+            password=data.get("password", existing.password) or "",
+            open_browser=bool(data.get("open_browser", existing.open_browser)),
+            enable_dashboard=bool(data.get("enable_dashboard", existing.enable_dashboard)),
+            dashboard_host=(data.get("dashboard_host", existing.dashboard_host) or "127.0.0.1"),
         )
         try:
             cfg.save()
@@ -415,7 +449,7 @@ def _build_app():
     return app
 
 
-def run_in_thread(open_browser: bool = True) -> tuple[threading.Thread, int]:
+def run_in_thread(open_browser: bool = True, host: str = "127.0.0.1") -> tuple[threading.Thread, int]:
     """
     Start the dashboard Flask server in a daemon thread.
     Called automatically on MCP server startup.
@@ -428,44 +462,62 @@ def run_in_thread(open_browser: bool = True) -> tuple[threading.Thread, int]:
         _log.warning("odoo-devkit dashboard disabled: %s", exc)
         return threading.Thread(daemon=True), 0
 
-    port = _find_free_port()
-    url = f"http://127.0.0.1:{port}/dashboard/"
+    global _last_dashboard_url
+
+    port = _find_free_port(host=host)
+    url_host = "localhost" if host == "0.0.0.0" else host
+    url = f"http://{url_host}:{port}/dashboard/"
+    _last_dashboard_url = url
 
     def _serve():
-        app.run(host="127.0.0.1", port=port, debug=False, use_reloader=False, threaded=True)
+        app.run(host=host, port=port, debug=False, use_reloader=False, threaded=True)
 
     thread = threading.Thread(target=_serve, daemon=True, name="odoo-devkit-dashboard")
     thread.start()
 
     _log.info("odoo-devkit dashboard started at %s", url)
-    # print so it shows in the MCP client log even without a logger attached
-    print(f"odoo-devkit dashboard: {url}", flush=True)
 
     if open_browser:
         def _open():
             import time
             time.sleep(0.8)  # wait for Flask to be ready
-            webbrowser.open(url)
+            _open_dashboard_in_browser(url)
         threading.Thread(target=_open, daemon=True).start()
 
     return thread, port
 
 
-def run_dashboard() -> None:
+def run_dashboard(host: str = "127.0.0.1", open_browser: bool = True) -> None:
     """Blocking entry-point used by `odoo-devkit --config` (opens browser, blocks)."""
     try:
         app = _build_app()
     except ImportError as exc:
         raise ImportError(str(exc))
 
-    port = _find_free_port()
-    url = f"http://127.0.0.1:{port}/dashboard/"
+    global _last_dashboard_url
+
+    port = _find_free_port(host=host)
+    url_host = "localhost" if host == "0.0.0.0" else host
+    url = f"http://{url_host}:{port}/dashboard/"
+    _last_dashboard_url = url
     print(f"odoo-devkit config dashboard: {url}", flush=True)
 
-    def _open():
-        import time
-        time.sleep(0.8)
-        webbrowser.open(url)
+    if open_browser:
+        def _open():
+            import time
+            time.sleep(0.8)
+            _open_dashboard_in_browser(url)
 
-    threading.Thread(target=_open, daemon=True).start()
-    app.run(host="127.0.0.1", port=port, debug=False, use_reloader=False, threaded=True)
+        threading.Thread(target=_open, daemon=True).start()
+    app.run(host=host, port=port, debug=False, use_reloader=False, threaded=True)
+
+
+def get_dashboard_url() -> str | None:
+    return _last_dashboard_url
+
+
+def open_dashboard() -> tuple[bool, str | None]:
+    url = get_dashboard_url()
+    if not url:
+        return False, None
+    return _open_dashboard_in_browser(url), url

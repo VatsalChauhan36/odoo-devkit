@@ -38,6 +38,10 @@ class OdooDevkitConfig:
     password: str = ""
     # Whether to auto-open the dashboard in the browser on MCP server startup
     open_browser: bool = True
+    # Whether to start the web dashboard with the MCP server
+    enable_dashboard: bool = True
+    # Dashboard bind/listen address
+    dashboard_host: str = "0.0.0.0"
 
     # ---------- persistence ----------
 
@@ -67,6 +71,10 @@ class OdooDevkitConfig:
                 password=data.get("password") or "",
                 # default True — missing key means old config file, keep opening
                 open_browser=data.get("open_browser", True),
+                # default True — missing key means old config file, keep dashboard enabled
+                enable_dashboard=data.get("enable_dashboard", True),
+                # default localhost — missing key means old config file
+                dashboard_host=data.get("dashboard_host") or "0.0.0.0",
             )
         except Exception:
             return cls()

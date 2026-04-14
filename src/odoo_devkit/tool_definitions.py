@@ -714,4 +714,16 @@ TOOL_DEFINITIONS = [
             "required": ["model", "method"],
         },
     ),
+    Tool(
+        name="open_dashboard",
+        description=(
+            "Open the running odoo-devkit dashboard in the default browser. "
+            "Useful when auto-open is disabled or unavailable at startup."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {},
+        },
+        annotations=READ_ONLY,
+    ),
 ]

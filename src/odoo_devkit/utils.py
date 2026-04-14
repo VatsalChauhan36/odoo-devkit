@@ -121,7 +121,8 @@ def to_toon(data: Any) -> str:
 
 
 def load_roots(cli_roots: list[str] | None) -> list[Path]:
-    # Priority: CLI args > ODOO_MCP_ROOTS env var > saved config file > built-in defaults
+    # Priority: CLI args > ODOO_MCP_ROOTS env var > saved config file > built-in defaults.
+    # Note: server CLI currently passes None because --roots is deprecated/no-op.
     env_roots = os.getenv("ODOO_MCP_ROOTS")
     if cli_roots:
         raw = cli_roots
@@ -149,8 +150,7 @@ def load_roots(cli_roots: list[str] | None) -> list[Path]:
 
     if not unique:
         raise ValueError(
-            "No valid roots found. Use --roots, ODOO_MCP_ROOTS env var, "
-            "or run 'odoo-devkit --config' to set paths via the GUI."
+            "No valid roots found. Set ODOO_MCP_ROOTS env var or configure roots in ~/.odoo-devkit/config.json."
         )
     return unique
 
