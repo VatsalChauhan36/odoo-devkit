@@ -351,6 +351,19 @@ code {
     align-items: center;
     gap: 10px;
     padding-top: 4px;
+    flex-wrap: wrap;
+}
+.save-scope-label {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+.save-scope-select {
+    padding: 7px 10px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg-input);
+    color: var(--text-primary);
+    font-size: 12px;
 }
 .save-path {
     font-size: 11px;
@@ -358,6 +371,14 @@ code {
     font-family: "SFMono-Regular", Consolas, monospace;
     margin-left: 4px;
     word-break: break-all;
+}
+.save-meta {
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    color: var(--text-muted);
+    font-size: 12px;
 }
 
 /* ── Toast ───────────────────────────────────────────────────── */

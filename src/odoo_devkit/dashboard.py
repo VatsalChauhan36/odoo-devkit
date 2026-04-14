@@ -70,6 +70,13 @@ def _build_app():
     app = Flask(__name__)
     _logging.getLogger("werkzeug").setLevel(_logging.ERROR)
 
+    def _resolve_project_root(raw: str | None) -> Path | None:
+        if raw and raw.strip():
+            candidate = Path(raw).expanduser().resolve()
+            if candidate.is_dir():
+                return candidate
+        return OdooDevkitConfig.find_project_root()
+
     # ── static files ──────────────────────────────────────────────────
     @app.route("/dashboard/")
     def index() -> Response:
@@ -82,7 +89,14 @@ def _build_app():
     # ── API ───────────────────────────────────────────────────────────
     @app.route("/api/config", methods=["GET"])
     def get_config():
-        cfg = OdooDevkitConfig.load()
+        project_root = _resolve_project_root(request.args.get("project_root"))
+        cfg = OdooDevkitConfig.load(project_root=project_root)
+        project_cfg_path = (
+            OdooDevkitConfig.project_config_file_path(project_root=project_root)
+            if project_root
+            else None
+        )
+        active_scope = "project" if (project_cfg_path and project_cfg_path.exists()) else "global"
         return jsonify({
             "roots":        cfg.roots,
             "odoo_bin":     cfg.odoo_bin,
@@ -96,12 +110,22 @@ def _build_app():
             "open_browser": cfg.open_browser,
             "enable_dashboard": cfg.enable_dashboard,
             "dashboard_host": cfg.dashboard_host,
+            "global_config_file": str(CONFIG_FILE),
+            "project_root": str(project_root) if project_root else None,
+            "project_config_file": str(project_cfg_path) if project_cfg_path else None,
+            "project_config_exists": bool(project_cfg_path and project_cfg_path.exists()),
+            "default_save_scope": "project" if project_root else "global",
+            "active_scope": active_scope,
+            "active_config_file": str(project_cfg_path if active_scope == "project" else CONFIG_FILE),
         })
 
     @app.route("/api/config", methods=["POST"])
     def save_config():
         data = request.get_json() or {}
-        existing = OdooDevkitConfig.load()
+        project_root = _resolve_project_root(str(data.get("project_root") or ""))
+        existing = OdooDevkitConfig.load(project_root=project_root)
+        scope_raw = str(data.get("scope") or "").strip().lower()
+        scope = scope_raw if scope_raw in {"global", "project"} else ("project" if project_root else "global")
         cfg = OdooDevkitConfig(
             roots=data.get("roots", existing.roots) or [],
             odoo_bin=data.get("odoo_bin", existing.odoo_bin) or "",
@@ -117,8 +141,14 @@ def _build_app():
             dashboard_host=(data.get("dashboard_host", existing.dashboard_host) or "127.0.0.1"),
         )
         try:
-            cfg.save()
-            return jsonify({"status": "ok", "config_file": str(CONFIG_FILE)})
+            config_file = cfg.save(scope=scope, project_root=project_root)
+            return jsonify({
+                "status": "ok",
+                "scope": scope,
+                "config_file": str(config_file),
+                "project_root": str(project_root) if project_root else None,
+                "global_config_file": str(CONFIG_FILE),
+            })
         except Exception as exc:
             return jsonify({"status": "error", "message": str(exc)}), 500
 
@@ -488,7 +518,7 @@ def run_in_thread(open_browser: bool = True, host: str = "127.0.0.1") -> tuple[t
 
 
 def run_dashboard(host: str = "127.0.0.1", open_browser: bool = True) -> None:
-    """Blocking entry-point used by `odoo-devkit --config` (opens browser, blocks)."""
+    """Blocking dashboard entry-point (opens browser, blocks)."""
     try:
         app = _build_app()
     except ImportError as exc:

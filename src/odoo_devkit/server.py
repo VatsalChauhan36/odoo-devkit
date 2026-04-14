@@ -1,4 +1,5 @@
 import argparse
+import os
 import sys
 from pathlib import Path
 from typing import Sequence
@@ -75,6 +76,14 @@ def main() -> None:
         help="Dashboard bind address (default: value from saved config, usually 127.0.0.1).",
     )
     parser.add_argument(
+        "--project-root",
+        default=None,
+        help=(
+            "Project root used for project-scoped config resolution. "
+            "When set, overrides auto-detection and sets ODOO_MCP_PROJECT_ROOT."
+        ),
+    )
+    parser.add_argument(
         "--open-browser",
         dest="open_browser",
         action="store_true",
@@ -102,6 +111,10 @@ def main() -> None:
             file=sys.stderr,
             flush=True,
         )
+
+    # Resolve project context before loading config/roots.
+    if args.project_root:
+        os.environ["ODOO_MCP_PROJECT_ROOT"] = str(Path(args.project_root).expanduser().resolve())
 
     # --roots is intentionally ignored (deprecated no-op).
     roots = load_roots(None)

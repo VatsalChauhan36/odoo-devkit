@@ -3,7 +3,7 @@ from typing import Any, Sequence
 
 from mcp.types import TextContent
 
-from ..constants import ODOO_DOCS_PATH
+from ..constants import get_odoo_docs_path
 from ..utils import resolve_allowed_path, run_rg, to_toon
 from .helpers import _find_module_for_file, _read_file_lines, _scope_for_module, _sort_records
 
@@ -77,7 +77,8 @@ def handle(
         if not query:
             raise ValueError("query is required")
         limit = int(str(arguments.get("limit", 20)))
-        if ODOO_DOCS_PATH is None:
+        docs_path = get_odoo_docs_path()
+        if docs_path is None:
             return [
                 TextContent(
                     type="text",
@@ -89,19 +90,19 @@ def handle(
                     ),
                 )
             ]
-        if not ODOO_DOCS_PATH.exists():
+        if not docs_path.exists():
             return [
                 TextContent(
                     type="text",
                     text=to_toon(
                         {
-                            "error": f"Docs path does not exist: {ODOO_DOCS_PATH}",
+                            "error": f"Docs path does not exist: {docs_path}",
                             "hint": "Check that ODOO_MCP_DOCS_PATH points to a valid directory.",
                         }
                     ),
                 )
             ]
-        matches = run_rg(query, [ODOO_DOCS_PATH.resolve()], ["*.rst", "*.md"], limit=limit)
+        matches = run_rg(query, [docs_path.resolve()], ["*.rst", "*.md"], limit=limit)
         return [TextContent(type="text", text=to_toon({"query": query, "matches": matches}))]
 
     return None

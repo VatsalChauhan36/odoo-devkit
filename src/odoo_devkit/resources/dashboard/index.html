@@ -129,7 +129,7 @@
                     <span class="card-hint">Searched by all tools &mdash; add custom, server, and enterprise dirs</span>
                 </div>
                 <p class="priority-note">
-                    Priority: <code>--roots</code> CLI &gt; <code>ODOO_MCP_ROOTS</code> env var &gt; paths below
+                    Priority: <code>ODOO_MCP_ROOTS</code> env var &gt; saved config below
                 </p>
                 <div id="roots-list" class="roots-list"></div>
                 <div class="input-row">
@@ -175,9 +175,18 @@
 
             <!-- Actions -->
             <div class="actions-bar">
+                <label for="save-scope" class="save-scope-label">Save scope</label>
+                <select id="save-scope" class="save-scope-select">
+                    <option value="project">Project</option>
+                    <option value="global">Global</option>
+                </select>
                 <button class="btn btn-primary" id="save-btn">Save Configuration</button>
                 <button class="btn btn-secondary" id="discard-btn">Discard Changes</button>
                 <span class="save-path" id="save-path"></span>
+            </div>
+            <div class="save-meta">
+                <span id="active-scope"></span>
+                <span id="project-root"></span>
             </div>
 
         </div><!-- #tab-config -->

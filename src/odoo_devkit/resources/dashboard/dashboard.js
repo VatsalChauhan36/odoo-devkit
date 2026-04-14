@@ -243,6 +243,7 @@ document.getElementById('check-rpc-btn').addEventListener('click', function () {
 // ── Roots list ────────────────────────────────────────────────────────────────
 
 let _roots = [];
+let _projectRoot = '';
 
 function renderRoots() {
     const list = document.getElementById('roots-list');
@@ -346,6 +347,7 @@ function loadConfig() {
     .then(function (r) { return r.json(); })
     .then(function (cfg) {
         _roots = cfg.roots || [];
+        _projectRoot = cfg.project_root || '';
         renderRoots();
 
         document.getElementById('python-path').value   = cfg.python_path || '';
@@ -357,6 +359,22 @@ function loadConfig() {
         document.getElementById('odoo-username').value = cfg.username    || 'admin';
         document.getElementById('odoo-password').value = cfg.password    || '';
         document.getElementById('open-browser').checked = cfg.open_browser !== false;
+        document.getElementById('save-path').textContent = cfg.active_config_file || '';
+
+        const scopeSelect = document.getElementById('save-scope');
+        const projectOpt = scopeSelect.querySelector('option[value="project"]');
+        const projectAvailable = !!cfg.project_root;
+        projectOpt.disabled = !projectAvailable;
+        scopeSelect.value = cfg.default_save_scope || (projectAvailable ? 'project' : 'global');
+        if (!projectAvailable && scopeSelect.value === 'project') scopeSelect.value = 'global';
+
+        const activeScopeText = cfg.active_scope
+            ? ('Active config: ' + cfg.active_scope + (cfg.active_config_file ? (' (' + cfg.active_config_file + ')') : ''))
+            : '';
+        document.getElementById('active-scope').textContent = activeScopeText;
+        document.getElementById('project-root').textContent = cfg.project_root
+            ? ('Project root: ' + cfg.project_root)
+            : 'Project root: not detected (global scope only)';
 
         // trigger path validation for pre-filled values
         ['python-path', 'odoo-bin', 'odoo-config', 'docs-path'].forEach(function (id) {
@@ -379,6 +397,8 @@ document.getElementById('save-btn').addEventListener('click', function () {
         username:     document.getElementById('odoo-username').value.trim(),
         password:     document.getElementById('odoo-password').value,
         open_browser: document.getElementById('open-browser').checked,
+        scope:        document.getElementById('save-scope').value,
+        project_root: _projectRoot || null,
     };
     fetch('/api/config', {
         method: 'POST',
@@ -388,8 +408,9 @@ document.getElementById('save-btn').addEventListener('click', function () {
     .then(function (r) { return r.json(); })
     .then(function (data) {
         if (data.status === 'ok') {
-            showToast('Configuration saved', 'ok');
+            showToast('Configuration saved (' + (data.scope || 'global') + ')', 'ok');
             document.getElementById('save-path').textContent = data.config_file;
+            loadConfig();
         } else {
             showToast('Error: ' + data.message, 'err');
         }
